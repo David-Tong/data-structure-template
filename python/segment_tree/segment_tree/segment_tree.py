@@ -1,24 +1,29 @@
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from segment_tree_base import SegmentTreeBase
-
-
-class SegmentTree(SegmentTreeBase):
+# -*- coding: utf-8 -*-
+class SegmentTree(object):
     """
     Segment tree with configurable aggregate function.
     Supports point update and range query in O(log n).
 
     External API is 0-based: idx, ql, qr all accept 0..N-1.
-    Internally the tree nodes are 1-based (root=1, children=2*node, 2*node+1),
+    Internally tree nodes are 1-based (root=1, children=2*node, 2*node+1),
     and the input array is shifted by +1 so position 0 maps to internal index 1.
-    This shift is an implementation detail — callers always use 0-based indices.
+
+    --- Interface ---
+    To adapt this template, override aggregate_func at construction time:
+
+      update(idx, val)      -- set element at 0-based idx to val
+      range_query(ql, qr)   -- return aggregate_func result over [ql..qr]
+
+    --- Customisation points ---
+      aggregate_func        -- any associative f(a, b): max, min, operator.add, ...
     """
 
     def __init__(self, nums, aggregate_func=max):
+        self.N = len(nums)
         self.aggregate_func = aggregate_func
         self._nums = [0] + nums  # internal shift: _nums[1..N] maps to nums[0..N-1]
-        super(SegmentTree, self).__init__(len(nums))
+        self.tree = [0] * (4 * self.N)
+        self._build()
 
     # --- Public ---
 
@@ -29,6 +34,12 @@ class SegmentTree(SegmentTreeBase):
     def range_query(self, ql, qr):
         """Return aggregate over [ql, qr] (0-based, inclusive)."""
         return self._query_node(1, 1, self.N, ql + 1, qr + 1)
+
+    def range_update(self, ql, qr, val):
+        """Blocked — O(n log n) on SegmentTree. Use LazySegmentTree instead."""
+        raise NotImplementedError(
+            "range_update is O(n log n) on SegmentTree. Use LazySegmentTree instead."
+        )
 
     # --- Private ---
 

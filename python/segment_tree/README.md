@@ -15,22 +15,23 @@ Without a segment tree, a range query is O(n) and an update requires rebuilding.
 
 ---
 
-## Interface Design
+## Interface
 
-A base class `SegmentTreeBase` defines the shared contract. Both `SegmentTree` and `LazySegmentTree` inherit from it.
+Each class is a self-contained file with no external dependencies — copy it directly into your project.
 
-### Base Class — `SegmentTreeBase`
+The public interface each class exposes:
 
-| Method | Signature | Error if not overridden | Description |
-|--------|-----------|------------------------|-------------|
-| `_build` | `_build()` | `TypeError` — abstract | Internal tree construction, called by `__init__` |
-| `range_query` | `range_query(ql, qr)` | `TypeError` — abstract | Query over `[ql, qr]` |
-| `update` | `update(idx, val)` | `TypeError` — abstract | Update element(s) in the tree |
-| `range_update` | `range_update(ql, qr, val)` | `NotImplementedError` — concrete, intentionally blocked | Blocked on `SegmentTree`; only available on `LazySegmentTree` |
+| Class | Method | Signature | Description |
+|-------|--------|-----------|-------------|
+| `SegmentTree` | `update` | `update(idx, val)` | Set element at 0-based `idx` to `val` |
+| `SegmentTree` | `range_query` | `range_query(ql, qr)` | Return aggregate over `[ql, qr]` |
+| `SegmentTree` | `range_update` | `range_update(ql, qr, val)` | **Blocked** — raises `NotImplementedError`. Use `LazySegmentTree` instead. |
+| `LazySegmentTree` | `update` | `update(ql, qr, val)` | Apply `val` to every element in `[ql, qr]` via `update_func` |
+| `LazySegmentTree` | `range_query` | `range_query(ql, qr)` | Return aggregate over `[ql, qr]` |
 
-`_build` is called by `__init__` so the caller never needs to invoke it directly.
+The interface contract is documented as comments inside each class — look for the `--- Interface ---` and `--- Customisation points ---` sections in the docstring.
 
-`update` and `range_update` sit together to make the point/range distinction visible.
+`update` and `range_update` sit together in the table to make the point/range distinction visible.
 
 ---
 
@@ -96,7 +97,7 @@ st.range_query(0, 2)                  # -> 6   (1*2*3)
 st.range_query(1, 4)                  # -> 120 (2*3*4*5)
 ```
 
-See `segment_tree/segment_tree_example.py` for the full runnable examples.
+See `segment_tree/test_segment_tree.py` for the full test suite.
 
 ### Original template use case
 
@@ -132,8 +133,8 @@ LazySegmentTree(n, aggregate_func=max, update_func=None, identity=0)
 |-----------|-------------|---------|
 | `n` | Size of the array | `10` |
 | `aggregate_func` | Aggregate function over two node values | `max`, `min`, `operator.add` |
-| `update_func` | How a delta is applied to a node value. Signature: `update_func(val, delta) -> new_val`. Default: additive (`val + delta`) | `lambda val, delta: val * delta` |
-| `identity` | Neutral element for `aggregate_func` (initial value of all nodes) | `0` for sum, `float('-inf')` for max, `float('inf')` for min |
+| `update_func` | How a delta is applied to a node's aggregate value. Signature: `update_func(val, delta, size) -> new_val` where `size` is the number of elements the node covers. Default: `lambda val, delta, size: val + delta` (correct for max/min). For sum use `lambda val, delta, size: val + delta * size`. | `lambda val, delta, size: val * delta` |
+| `identity` | Starting value of every node (neutral element for `aggregate_func`). Use `0` when initialising all elements via additive `update(i, i, v)`, since `0 + v = v`. | `0` |
 
 ### Methods
 
@@ -148,15 +149,19 @@ Three parameters work together. The right `identity` is the neutral element for 
 
 | Goal | `aggregate_func` | `update_func` | `identity` |
 |------|-----------------|---------------|------------|
-| Range sum + range add | `operator.add` | default (additive) | `0` |
-| Range max + range add | `max` | default (additive) | `float('-inf')` |
-| Range min + range add | `min` | default (additive) | `float('inf')` |
-| Range sum + range multiply | `operator.add` | `lambda val, d: val * d` | `1` |
+| Range sum + range add | `operator.add` | `lambda val, d, size: val + d * size` | `0` |
+| Range max + range add | `max` | default (`val + delta`) | `0` |
+| Range min + range add | `min` | default (`val + delta`) | `0` |
+| Range sum + range multiply | `operator.add` | `lambda val, d, size: val * d` | `1` |
+
+The `size` parameter in `update_func` is the number of elements a node covers. It matters for sum: adding `delta` to a node whose range covers `size` elements should increase the total by `delta * size`. For max/min the default (`val + delta`) is correct because shifting all elements by `delta` shifts the max/min by the same amount.
 
 **Range sum with range add** — total salaries, apply raises to a department:
 ```python
 import operator
-st = LazySegmentTree(6, aggregate_func=operator.add, identity=0)
+st = LazySegmentTree(6, aggregate_func=operator.add,
+                     update_func=lambda val, delta, size: val + delta * size,
+                     identity=0)
 st.update(0, 5, 200)    # give everyone a 200 raise
 st.update(1, 3, 500)    # give department [1..3] an extra 500
 st.range_query(0, 5)    # -> total salary bill
@@ -165,7 +170,7 @@ st.range_query(1, 3)    # -> department [1..3] total
 
 **Range max with range add** — player scores, add bonus points to a group:
 ```python
-st = LazySegmentTree(6, aggregate_func=max, identity=float('-inf'))
+st = LazySegmentTree(6, aggregate_func=max, identity=0)
 st.update(2, 4, 10)     # award 10 bonus points to players [2..4]
 st.range_query(0, 5)    # -> highest score overall
 st.range_query(0, 2)    # -> highest score in [0..2]
@@ -173,7 +178,7 @@ st.range_query(0, 2)    # -> highest score in [0..2]
 
 **Range min with range add** — item prices, apply a discount to a range:
 ```python
-st = LazySegmentTree(5, aggregate_func=min, identity=float('inf'))
+st = LazySegmentTree(5, aggregate_func=min, identity=0)
 st.update(1, 3, -15)    # apply -15 discount to items [1..3]
 st.range_query(0, 4)    # -> cheapest item overall
 st.range_query(2, 4)    # -> cheapest item in [2..4]
@@ -181,14 +186,14 @@ st.range_query(2, 4)    # -> cheapest item in [2..4]
 
 **Custom update_func: range multiply** — scale values in a range by a multiplier:
 
-The default `update_func` adds a delta to each node value. For multiplication you replace it with `lambda val, delta: val * delta`.
+The default `update_func` adds a delta to each node value. For multiplication you replace it with `lambda val, delta, size: val * delta`.
 
 Three parameters work together:
 
 | Parameter | Value | Why |
 |-----------|-------|-----|
 | `aggregate_func` | `operator.add` | you want the *sum* of the range after multiplying |
-| `update_func` | `lambda val, delta: val * delta` | each element is *multiplied* by delta |
+| `update_func` | `lambda val, delta, size: val * delta` | each element is *multiplied* by delta |
 | `identity` | `1` | the neutral element for multiplication: `1 * x = x`, so unset nodes start at 1 and any `update(i, i, v)` call gives `1 * v = v` |
 
 Why `identity=1` and not `0`? If identity were `0`, then `update_func(0, v) = 0 * v = 0` — every element would stay zero no matter what you multiply by.
@@ -198,7 +203,7 @@ import operator
 values = [2, 3, 4, 5, 6]
 #  index:  0  1  2  3  4
 st = LazySegmentTree(5, aggregate_func=operator.add,
-                     update_func=lambda val, delta: val * delta,
+                     update_func=lambda val, delta, size: val * delta,
                      identity=1)
 for i, v in enumerate(values):
     st.update(i, i, v)         # initialise: each element set via 1 * v = v
@@ -211,7 +216,7 @@ st.range_query(1, 3)           # -> 24  (6+8+10)
 
 **Limitation**: the internal lazy accumulator is additive (`lazy += delta`). If two multiplicative range updates overlap on the same node before the lazy value is pushed down, the second delta is added to the first instead of multiplied — giving a wrong result. Range multiply is therefore safe only when range updates do not overlap. For full correctness with overlapping range multiplies you would need a custom subclass that overrides `_apply` and `_push_down` to combine lazy values multiplicatively.
 
-See `lazy_segment_tree/lazy_segment_tree_example.py` for the full runnable examples.
+See `lazy_segment_tree/test_lazy_segment_tree.py` for the full test suite.
 
 ### Original template use case and find_first
 
@@ -238,8 +243,8 @@ Our generic `range_query` only returns an aggregate, not a position. To find the
 To replicate it, use **two trees** — one tracking `min`, one tracking `max` — and apply every update to both:
 
 ```python
-st_min = LazySegmentTree(n, aggregate_func=min, identity=float('inf'))
-st_max = LazySegmentTree(n, aggregate_func=max, identity=float('-inf'))
+st_min = LazySegmentTree(n, aggregate_func=min, identity=0)
+st_max = LazySegmentTree(n, aggregate_func=max, identity=0)
 
 # A range [ql..qr] contains target iff:
 #   st_min.range_query(ql, qr) <= target <= st_max.range_query(ql, qr)
@@ -257,7 +262,7 @@ def find_first(ql, qr, target):
     return lo
 ```
 
-See `lazy_segment_tree/lazy_segment_tree_example.py` Example 0 for the full runnable version.
+See `lazy_segment_tree/test_lazy_segment_tree.py` `test_find_first_workaround` for the full runnable version.
 
 ---
 
@@ -281,7 +286,7 @@ The two classes serve different use cases:
 - `SegmentTree` — point update `update(idx, val)`, range aggregate query
 - `LazySegmentTree` — range update `update(ql, qr, val)`, range aggregate query
 
-Forcing identical signatures would require `*args`/`**kwargs` and lose clarity. The base class enforces the method exists; each subclass owns its own signature.
+Forcing identical signatures would require `*args`/`**kwargs` and lose clarity. Each class owns its own signature and documents it in the `--- Interface ---` comment block in its docstring.
 
 ---
 
@@ -299,13 +304,18 @@ Range update is possible in a normal segment tree but is not efficient:
 
 ---
 
-## Class Hierarchy
+## Running tests
 
+```bash
+# run all tests from the segment_tree/ folder
+pytest segment_tree/ lazy_segment_tree/ -v
+
+# or run one suite at a time
+pytest segment_tree/test_segment_tree.py -v
+pytest lazy_segment_tree/test_lazy_segment_tree.py -v
 ```
-SegmentTreeBase
-├── SegmentTree          (point update, range query)
-└── LazySegmentTree      (range update, range query)
-```
+
+Each test function maps to one customisation scenario described in this README.
 
 ---
 
@@ -314,11 +324,10 @@ SegmentTreeBase
 ```
 segment_tree/
 ├── README.md
-├── segment_tree_base.py          # SegmentTreeBase (ABC)
 ├── segment_tree/
-│   ├── segment_tree.py           # SegmentTree(SegmentTreeBase)
-│   └── segment_tree_example.py
+│   ├── segment_tree.py              # SegmentTree — self-contained, no dependencies
+│   └── test_segment_tree.py         # pytest test suite (examples + assertions)
 └── lazy_segment_tree/
-    ├── lazy_segment_tree.py      # LazySegmentTree(SegmentTreeBase)
-    └── lazy_segment_tree_example.py
+    ├── lazy_segment_tree.py         # LazySegmentTree — self-contained, no dependencies
+    └── test_lazy_segment_tree.py    # pytest test suite (examples + assertions)
 ```
