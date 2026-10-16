@@ -27,6 +27,7 @@ The public interface each class exposes:
 | `SegmentTree` | `range_query` | `range_query(ql, qr)` | Return aggregate over `[ql, qr]` |
 | `SegmentTree` | `range_update` | `range_update(ql, qr, val)` | **Blocked** — raises `NotImplementedError`. Use `LazySegmentTree` instead. |
 | `LazySegmentTree` | `update` | `update(ql, qr, val)` | Apply `val` to every element in `[ql, qr]` via `update_func` |
+| `LazySegmentTree` | `range_update` | `range_update(ql, qr, val)` | Alias for `update` |
 | `LazySegmentTree` | `range_query` | `range_query(ql, qr)` | Return aggregate over `[ql, qr]` |
 
 The interface contract is documented as comments inside each class — look for the `--- Interface ---` and `--- Customisation points ---` sections in the docstring.
@@ -126,7 +127,7 @@ st.range_query(0, 2)         # -> 9   (max updated)
 ### Constructor
 
 ```python
-LazySegmentTree(n, aggregate_func=max, update_func=None, identity=0)
+LazySegmentTree(n, aggregate_func=max, update_func=None, identity=0, nums=None)
 ```
 
 | Parameter | Description | Example |
@@ -134,7 +135,8 @@ LazySegmentTree(n, aggregate_func=max, update_func=None, identity=0)
 | `n` | Size of the array | `10` |
 | `aggregate_func` | Aggregate function over two node values | `max`, `min`, `operator.add` |
 | `update_func` | How a delta is applied to a node's aggregate value. Signature: `update_func(val, delta, size) -> new_val` where `size` is the number of elements the node covers. Default: `lambda val, delta, size: val + delta` (correct for max/min). For sum use `lambda val, delta, size: val + delta * size`. | `lambda val, delta, size: val * delta` |
-| `identity` | Starting value of every node (neutral element for `aggregate_func`). Use `0` when initialising all elements via additive `update(i, i, v)`, since `0 + v = v`. | `0` |
+| `identity` | Starting value of every node. Must be the neutral element for `aggregate_func`. See `identity` section below. | `0` |
+| `nums` | Optional initial list of values loaded into the tree during construction. | `[3, 1, 4, 1, 5]` |
 
 ### Methods
 
@@ -143,18 +145,106 @@ LazySegmentTree(n, aggregate_func=max, update_func=None, identity=0)
 | `update` | `update(ql, qr, val)` | Apply `val` to every element in `[ql, qr]` via `update_func` |
 | `range_query` | `range_query(ql, qr)` | Return `func` aggregate over `[ql, qr]` |
 
+### `identity` — starting value for every node
+
+Every node is initialised to `identity` before any data is loaded. It must be the **neutral element** for `aggregate_func`: a value `e` where `aggregate_func(e, x) == x` for any `x`. Wrong choice means queries on uninitialised nodes return garbage.
+
+| `aggregate_func` | correct `identity` | why |
+|------------------|--------------------|-----|
+| `max` | `0` (if all values ≥ 0) or `float('-inf')` | `max(e, x) == x` |
+| `min` | `0` (if all values ≥ 0) or `float('inf')` | `min(e, x) == x` |
+| `operator.add` | `0` | `0 + x == x` |
+| `operator.mul` | `1` | `1 * x == x` |
+
+**Second constraint — must survive `update_func`**: when you load initial values via `update(i, i, v)` (either manually or through `nums`), the tree calls `update_func(identity, v, 1)` on each leaf. That result must equal `v`, otherwise the loaded value is wrong from the start.
+
+- Additive `update_func` (`val + delta`): `update_func(0, v, 1) = 0 + v = v` ✓ — use `identity=0`
+- Multiplicative `update_func` (`val * delta`): `update_func(1, v, 1) = 1 * v = v` ✓ — use `identity=1`
+- `identity=float('-inf')` with additive update: `float('-inf') + v = float('-inf')` ✗ — broken
+
+### `nums` — initial values
+
+`nums` is a convenience shortcut. Passing `nums=[a, b, c, ...]` is exactly equivalent to constructing the tree and then calling:
+
+```python
+for i, v in enumerate(nums):
+    st.update(i, i, v)
+```
+
+The `identity` constraint above applies: the tree must be able to recover `v` from `update_func(identity, v, 1)`. With the default additive `update_func` and `identity=0` this always holds.
+
+```python
+# These two are identical:
+st = LazySegmentTree(5, aggregate_func=max, identity=0, nums=[10, 20, 15, 30, 25])
+
+st = LazySegmentTree(5, aggregate_func=max, identity=0)
+for i, v in enumerate([10, 20, 15, 30, 25]):
+    st.update(i, i, v)
+```
+
 ### How to customise
 
-Three parameters work together. The right `identity` is the neutral element for `aggregate_func` — the value `v` where `aggregate_func(v, x) == x` for any `x`.
+| Goal | `aggregate_func` | `update_func` | needs `size`? | `identity` |
+|------|-----------------|---------------|---------------|------------|
+| Range sum + range add | `operator.add` | `lambda val, delta, size: val + delta * size` | **yes** — sum grows by `delta` per element | `0` |
+| Range max + range add | `max` | `lambda val, delta, size: val + delta` | no — max shifts by `delta` regardless of count | `0` |
+| Range min + range add | `min` | `lambda val, delta, size: val + delta` | no — min shifts by `delta` regardless of count | `0` |
+| Range sum + range multiply | `operator.add` | `lambda val, delta, size: val * delta` | no — sum scales by `delta` regardless of count | `1` |
 
-| Goal | `aggregate_func` | `update_func` | `identity` |
-|------|-----------------|---------------|------------|
-| Range sum + range add | `operator.add` | `lambda val, d, size: val + d * size` | `0` |
-| Range max + range add | `max` | default (`val + delta`) | `0` |
-| Range min + range add | `min` | default (`val + delta`) | `0` |
-| Range sum + range multiply | `operator.add` | `lambda val, d, size: val * d` | `1` |
+**When does `update_func` need `size`?** It depends on the combination of `update_func` and `aggregate_func` — not either one alone:
 
-The `size` parameter in `update_func` is the number of elements a node covers. It matters for sum: adding `delta` to a node whose range covers `size` elements should increase the total by `delta * size`. For max/min the default (`val + delta`) is correct because shifting all elements by `delta` shifts the max/min by the same amount.
+> Does applying the update to each element change the aggregate by a **fixed amount**, or by an amount that **scales with the number of elements**?
+
+Node covering `[1..3]`, original values `[4, 7, 2]`, `delta=3`, `size=3`.
+
+**Add delta=3 to every element, aggregate=sum**
+```
+values: [4, 7, 2]  ->  [7, 10, 5]
+sum before: 13
+sum after:  22 = 13 + 3*3    # delta added 3 times, once per element -> needs size
+update_func: lambda val, delta, size: val + delta * size
+```
+
+**Add delta=3 to every element, aggregate=max**
+```
+values: [4, 7, 2]  ->  [7, 10, 5]
+max before: 7
+max after:  10 = 7 + 3       # max just shifts by delta regardless of how many elements
+update_func: lambda val, delta, size: val + delta
+```
+
+**Multiply every element by delta=3, aggregate=sum**
+```
+values: [4, 7, 2]  ->  [12, 21, 6]
+sum before: 13
+sum after:  39 = 13 * 3      # whole sum scales by delta regardless of how many elements
+update_func: lambda val, delta, size: val * delta
+```
+
+**Multiply every element by delta=3, aggregate=max**
+```
+values: [4, 7, 2]  ->  [12, 21, 6]
+max before: 7
+max after:  21 = 7 * 3       # max scales by delta regardless of how many elements
+update_func: lambda val, delta, size: val * delta
+```
+
+`size` is only needed in one case: **additive update + sum aggregate**.
+
+**What is `size` in `update_func`?**
+
+A segment tree node stores the *aggregate of a range*, not individual elements. When a range update covers a node exactly, the tree skips visiting each element and applies `delta` once to the stored aggregate instead (lazy propagation). `size` — the number of original array elements in the node's range — lets `update_func` compute the correct new aggregate without touching each element individually.
+
+For max/min, shifting every element by `delta` shifts the aggregate by exactly `delta`, regardless of range width. For sum, `delta` is added once per element, so the total increases by `delta * size`. Without the `* size`, a range update over 100 elements would only add `delta` once to the node's sum instead of 100 times.
+
+**Why does range multiply not need `size`?** Multiplication distributes cleanly over any aggregate:
+
+```
+(a*δ) + (b*δ) + (c*δ) = (a+b+c) * δ   →  sum * delta,  no size needed
+max(a*δ, b*δ, c*δ)    = max(a,b,c) * δ →  max * delta,  no size needed
+```
+
+The stored aggregate just gets scaled by `delta` regardless of how many elements are in the range. Addition does not have this property — adding `delta` to each element increases the sum by `delta * size`, not `delta * 1`.
 
 **Range sum with range add** — total salaries, apply raises to a department:
 ```python
@@ -194,9 +284,7 @@ Three parameters work together:
 |-----------|-------|-----|
 | `aggregate_func` | `operator.add` | you want the *sum* of the range after multiplying |
 | `update_func` | `lambda val, delta, size: val * delta` | each element is *multiplied* by delta |
-| `identity` | `1` | the neutral element for multiplication: `1 * x = x`, so unset nodes start at 1 and any `update(i, i, v)` call gives `1 * v = v` |
-
-Why `identity=1` and not `0`? If identity were `0`, then `update_func(0, v) = 0 * v = 0` — every element would stay zero no matter what you multiply by.
+| `identity` | `1` | neutral element for multiplication — see `identity` section above |
 
 ```python
 import operator

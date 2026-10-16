@@ -16,11 +16,21 @@ class LazySegmentTree(object):
 
       update_func     -- how a lazy delta is applied to a node's aggregate value.
                          signature: update_func(current_val, delta, size) -> new_val
-                         size = number of elements covered by the node.
-                         The size argument is what makes sum correct for range updates:
-                           max/min: lambda val, delta, size: val + delta
-                           sum:     lambda val, delta, size: val + delta * size
-                         Default is the max/min variant (val + delta).
+
+                         Each node stores the aggregate of its range, not individual
+                         elements. `size` is how many array elements that range holds.
+                         It is needed because the right formula differs by aggregate:
+
+                           node covers [1..3], values [4,7,2], delta=3:
+                             max: 7 -> 10  just val+delta, size does not matter
+                             sum: 13 -> 22 must be val+delta*size (3 elements * 3)
+
+                           max/min add:  lambda val, delta, size: val + delta
+                           sum add:      lambda val, delta, size: val + delta * size
+                           any multiply: lambda val, delta, size: val * delta
+                             (multiply distributes: (a+b+c)*d = sum*d, no size needed)
+
+                         Default is additive max/min (val + delta).
 
       identity        -- starting value for every node (neutral element for aggregate_func).
                          Use 0 when all elements are initialised via additive update(i, i, v),
@@ -35,18 +45,25 @@ class LazySegmentTree(object):
             self.val = identity   # aggregate value for this node's range
             self.lazy = 0         # pending update not yet pushed to children
 
-    def __init__(self, n, aggregate_func=max, update_func=None, identity=0):
+    def __init__(self, n, aggregate_func=max, update_func=None, identity=0, nums=None):
         self.N = n
         self.aggregate_func = aggregate_func
         self.update_func = update_func if update_func is not None \
             else lambda val, delta, size: val + delta
         self.identity = identity
         self.nodes = [self.Node(identity) for _ in range(4 * (n + 1))]
+        if nums is not None:
+            for i, v in enumerate(nums):
+                self.update(i, i, v)
 
     # --- Public ---
 
     def update(self, ql, qr, val):
         """Apply val to every element in [ql, qr] (0-based, inclusive) via update_func."""
+        self._update_node(1, 0, self.N - 1, ql, qr, val)
+
+    def range_update(self, ql, qr, val):
+        """Alias for update — apply val to every element in [ql, qr] via update_func."""
         self._update_node(1, 0, self.N - 1, ql, qr, val)
 
     def range_query(self, ql, qr):

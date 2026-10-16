@@ -14,20 +14,10 @@ from lazy_segment_tree import LazySegmentTree
 # =============================================================================
 
 
-def _make_st(n, vals, aggregate_func=max, update_func=None, identity=0):
-    """Helper: build a LazySegmentTree and initialise it element by element."""
-    st = LazySegmentTree(n, aggregate_func=aggregate_func,
-                         update_func=update_func, identity=identity)
-    for i, v in enumerate(vals):
-        st.update(i, i, v)   # size=1 for a single element, so update_func(0, v, 1) = v
-    return st
-
-
 def test_find_first_workaround():
     # Original template use case: range additive update + find_first.
     # Workaround: two trees (min + max) and binary search.
     # All elements start at 0 (identity=0). range_add accumulates onto that base.
-    # identity=0 is correct here: 0 + delta = delta, so additive init works.
     n = 5
     st_min = LazySegmentTree(n, aggregate_func=min, identity=0)
     st_max = LazySegmentTree(n, aggregate_func=max, identity=0)
@@ -64,13 +54,12 @@ def test_find_first_workaround():
 
 def test_range_sum_with_range_add():
     # Employees have base salaries; apply raises to a department, then query totals.
-    salaries = [5000, 4000, 4500, 6000, 5500, 4800]
-    n = len(salaries)
     # For sum, update_func must scale delta by size so a range update adds
     # delta to each element, not just once to the node's aggregate.
-    st = _make_st(n, salaries, aggregate_func=operator.add,
-                  update_func=lambda val, delta, size: val + delta * size,
-                  identity=0)
+    salaries = [5000, 4000, 4500, 6000, 5500, 4800]
+    st = LazySegmentTree(len(salaries), aggregate_func=operator.add,
+                         update_func=lambda val, delta, size: val + delta * size,
+                         identity=0, nums=salaries)
 
     assert st.range_query(0, 5) == 29800
     assert st.range_query(2, 4) == 16000
@@ -87,9 +76,7 @@ def test_range_sum_with_range_add():
 def test_range_max_with_range_add():
     # Players have scores; add bonus points to a range, then find the highest score.
     scores = [10, 20, 15, 30, 25, 18]
-    n = len(scores)
-    # identity=0: nodes start at 0, update(i,i,v) adds v -> node gets v
-    st = _make_st(n, scores, aggregate_func=max, identity=0)
+    st = LazySegmentTree(len(scores), aggregate_func=max, identity=0, nums=scores)
 
     assert st.range_query(0, 5) == 30
     assert st.range_query(0, 2) == 20
@@ -102,9 +89,7 @@ def test_range_max_with_range_add():
 def test_range_min_with_range_add():
     # Items have prices; apply a discount to a range, then find the cheapest.
     prices = [100, 80, 120, 90, 110]
-    n = len(prices)
-    # identity=0: nodes start at 0, update(i,i,v) adds v -> node gets v
-    st = _make_st(n, prices, aggregate_func=min, identity=0)
+    st = LazySegmentTree(len(prices), aggregate_func=min, identity=0, nums=prices)
 
     assert st.range_query(0, 4) == 80
     assert st.range_query(2, 4) == 90
@@ -114,16 +99,30 @@ def test_range_min_with_range_add():
     assert st.range_query(2, 4) == 75
 
 
+def test_range_update_alias():
+    # range_update is an alias for update — both should produce identical results
+    vals = [10, 20, 15, 30, 25]
+    st_a = LazySegmentTree(len(vals), aggregate_func=max, identity=0, nums=vals)
+    st_b = LazySegmentTree(len(vals), aggregate_func=max, identity=0, nums=vals)
+
+    st_a.update(1, 3, 5)
+    st_b.range_update(1, 3, 5)
+
+    for i in range(len(vals)):
+        assert st_a.range_query(i, i) == st_b.range_query(i, i)
+    assert st_a.range_query(0, 4) == st_b.range_query(0, 4)
+
+
 def test_range_multiply_no_overlap():
     # Scale values in a range by a multiplier, then query the total sum.
     # update_func is multiplicative; identity=1 so 1*v=v on initialisation.
-    # Safe here because the single range update does not overlap itself.
+    # Multiplicative update does not need size: multiplying every element by delta
+    # scales the aggregate by the same factor regardless of range width.
+    # (a*d) + (b*d) + (c*d) = (a+b+c)*d  ->  val * delta, no * size needed.
     values = [2, 3, 4, 5, 6]
-    n = len(values)
-    st = _make_st(n, values,
-                  aggregate_func=operator.add,
-                  update_func=lambda val, delta, size: val * delta,
-                  identity=1)
+    st = LazySegmentTree(len(values), aggregate_func=operator.add,
+                         update_func=lambda val, delta, size: val * delta,
+                         identity=1, nums=values)
 
     assert st.range_query(0, 4) == 20  # 2+3+4+5+6
 
