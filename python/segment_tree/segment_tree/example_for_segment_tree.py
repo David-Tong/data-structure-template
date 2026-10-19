@@ -10,6 +10,7 @@ from segment_tree import SegmentTree
 
 
 def demonstrate_point_updates():
+    print("=== demonstrate_point_updates() ===")
     # Start:                 [200, 150, 300, 250, 400]
     # Set index 2 to 130:    [200, 150, 130, 250, 400]
     # Initially: sum [1..3] = 700, total = 1300.
@@ -29,6 +30,7 @@ def demonstrate_point_updates():
 
 
 def demonstrate_min_max_queries():
+    print("=== demonstrate_min_max_queries() ===")
     # Start:                [10, 20, 15, 30, 25]
     # Set index 3 to 5:     [10, 20, 15, 5, 25]
     # Overall minimum: 10 -> 5; overall maximum: 30 -> 25.
@@ -48,6 +50,7 @@ def demonstrate_min_max_queries():
 
 
 def demonstrate_custom_aggregate():
+    print("=== demonstrate_custom_aggregate() ===")
     # Start:                [1, 2, 3, 4, 5]
     # Set index 0 to 3:     [3, 2, 3, 4, 5]
     # Product [0..2]: 1 * 2 * 3 = 6 -> 3 * 2 * 3 = 18.
@@ -61,7 +64,9 @@ def demonstrate_custom_aggregate():
 
 def main():
     demonstrate_point_updates()
+    print()
     demonstrate_min_max_queries()
+    print()
     demonstrate_custom_aggregate()
 
 

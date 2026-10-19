@@ -20,18 +20,23 @@ them all. Each function includes array-state comments and expected results.
 Expected output:
 
 ```text
+=== demonstrate_point_updates() ===
 Initial sales: [200, 150, 300, 250, 400]
 Range sum [1..3]: 700
 Total: 1300
 After setting index 2 to 130: [200, 150, 130, 250, 400]
 Range sum [1..3]: 530
 Total: 1130
+
+=== demonstrate_min_max_queries() ===
 Initial values: [10, 20, 15, 30, 25]
 Minimum: 10
 Maximum: 30
 After setting index 3 to 5: [10, 20, 15, 5, 25]
 Minimum: 5
 Maximum: 25
+
+=== demonstrate_custom_aggregate() ===
 Initial product [0..2]: 6
 Product [0..2] after setting index 0 to 3: 18
 ```

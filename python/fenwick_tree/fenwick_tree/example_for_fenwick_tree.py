@@ -11,6 +11,7 @@ from fenwick_tree import FenwickTree
 
 
 def demonstrate_point_updates():
+    print("=== demonstrate_point_updates() ===")
     # Start:                      [0, 0, 0, 0, 0]
     # Load initial sales:         [200, 150, 300, 250, 400]
     # Add 50 at index 1:          [200, 200, 300, 250, 400]
@@ -54,6 +55,7 @@ def demonstrate_point_updates():
 
 
 def demonstrate_range_updates():
+    print("=== demonstrate_range_updates() ===")
     # Start:                       [0, 0, 0, 0, 0]
     # Add 3 to indices 1 through 3: [0, 3, 3, 3, 0]
     # Subtract 1 from 2 through 4:  [0, 3, 2, 2, -1]
@@ -87,6 +89,7 @@ def demonstrate_range_updates():
 
 def main():
     demonstrate_point_updates()
+    print()
     demonstrate_range_updates()
 
 

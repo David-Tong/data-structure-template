@@ -10,6 +10,7 @@ from lazy_segment_tree import LazySegmentTree
 
 
 def demonstrate_range_updates():
+    print("=== demonstrate_range_updates() ===")
     # Start:                       [0, 0, 0, 0, 0]
     # Add 3 to indices 1 through 3: [0, 3, 3, 3, 0]
     # Subtract 1 from 2 through 4:  [0, 3, 2, 2, -1]
@@ -31,6 +32,7 @@ def demonstrate_range_updates():
 
 
 def demonstrate_min_max_queries():
+    print("=== demonstrate_min_max_queries() ===")
     # Start:                         [10, 20, 15, 30, 25]
     # Subtract 15 from 1 through 3:   [10, 5, 0, 15, 25]
     # Overall minimum: 10 -> 0; overall maximum: 30 -> 25.
@@ -52,6 +54,7 @@ def demonstrate_min_max_queries():
 
 def main():
     demonstrate_range_updates()
+    print()
     demonstrate_min_max_queries()
 
 

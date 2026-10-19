@@ -21,6 +21,7 @@ each step and the expected results.
 Expected output:
 
 ```text
+=== demonstrate_range_updates() ===
 Start: [0, 0, 0, 0, 0]
 After adding 3 to [1..3]: [0, 3, 3, 3, 0]
 Total: 9
@@ -31,6 +32,8 @@ Range sum [1..3]: 7
 After adding 2 to [0..4]: [2, 5, 4, 4, 1]
 Total: 16
 Range sum [1..3]: 13
+
+=== demonstrate_min_max_queries() ===
 Initial values: [10, 20, 15, 30, 25]
 Minimum: 10
 Maximum: 30
