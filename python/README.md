@@ -6,6 +6,11 @@ Python 2.7 compatible data structure templates.
 
 ```
 python/
+├── fenwick_tree/
+│   ├── fenwick_tree/
+│   │   ├── fenwick_tree.py            # FenwickTree class
+│   │   └── test_fenwick_tree.py       # Tests and usage examples
+│   └── README.md
 ├── segment_tree/
 │   ├── segment_tree/
 │   │   ├── segment_tree.py           # SegmentTree class
@@ -15,6 +20,16 @@ python/
 │       └── lazy_segment_tree_example.py  # Usage examples
 └── README.md
 ```
+
+## Fenwick Tree
+
+### `fenwick_tree/fenwick_tree/fenwick_tree.py`
+
+#### `FenwickTree`
+- Point addition and inclusive prefix sum with 0-based indices
+- `add(i, delta)` adds to an element; `sum(i)` returns the sum over `[0, i]`
+- `O(n)` construction and storage, `O(log n)` update and query
+- See [Fenwick Tree](fenwick_tree/README.md) for usage and range sums
 
 ## Segment Tree
 
