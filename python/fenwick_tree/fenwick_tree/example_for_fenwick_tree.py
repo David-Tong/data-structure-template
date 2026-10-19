@@ -66,9 +66,17 @@ def demonstrate_range_updates():
     b1, b2 = FenwickTree(n), FenwickTree(n)
 
     def prefix_sum(index):
+        # sum(A[0..index]) = (index+1)*sum(D[j]) - sum(j*D[j])
+        # D[j] at position j contributes to elements j through index,
+        # so it appears (index - j + 1) times in the prefix sum.
+        # Split that count into (index+1) copies minus j copies:
+        #   (index+1)*b1.sum(index) supplies the first term,
+        #   b2.sum(index) supplies the correction j*D[j].
         return (index + 1) * b1.sum(index) - b2.sum(index)
 
     def range_sum(left, right):
+        # Subtract the prefix ending just before left from the prefix ending at right.
+        # prefix_sum(-1) returns 0, so this also works when left == 0.
         return prefix_sum(right) - prefix_sum(left - 1)
 
     print("Range updates using two Fenwick trees:")

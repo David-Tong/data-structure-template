@@ -196,46 +196,63 @@ But we want the sum of **all elements** from 0 through 3, which is 9.
 
 ### 2. Count how many times each change contributes
 
-The change `+3` at index 1 contributes to three elements in the prefix ending
-at index 3:
+After `range_add(1, 3, 3)` the array is `[0, 3, 3, 3, 0]` and the difference
+array is `D = [0, 3, 0, 0, -3]`. We want `prefix_sum(3) = 0 + 3 + 3 + 3 = 9`.
+
+Each element is the running total of `D`, so expand them:
 
 ```text
-A[0] = D[0]
-A[1] = D[0] + D[1]
-A[2] = D[0] + D[1] + D[2]
-A[3] = D[0] + D[1] + D[2] + D[3]
+A[0] = D[0]                       =  0
+A[1] = D[0] + D[1]                =  0 + 3 = 3
+A[2] = D[0] + D[1] + D[2]         =  0 + 3 + 0 = 3
+A[3] = D[0] + D[1] + D[2] + D[3]  =  0 + 3 + 0 + 0 = 3
 ```
 
-Adding these rows counts `D[0]` four times, `D[1]` three times, `D[2]` twice,
-and `D[3]` once. In general, a change at index `j` appears `p + 1 - j` times
-in the prefix ending at `p`.
-
-We can calculate that in two parts: count every change `p + 1` times, then
-subtract the extra `j` copies of each change. The second tree, `b2`, stores
-`j * D[j]` to supply that correction.
-
-| Tree | Values it represents | What its prefix query returns |
-| --- | --- | --- |
-| `b1` | `D[j]` | Sum of changes through `p`, equal to `A[p]` |
-| `b2` | `j * D[j]` | Sum of the corrections through `p` |
-
-These are the logical values stored through point additions, not the trees'
-internal `bit` lists. The resulting formula is:
+Now sum the four rows to get `prefix_sum(3)`. Count how many rows each `D[j]` appears in:
 
 ```text
-sum of A[0..p] = (p + 1) * b1.sum(p) - b2.sum(p)
+D[0] appears in all 4 rows  ->  4 × D[0] = 4 × 0  =  0
+D[1] appears in 3 rows      ->  3 × D[1] = 3 × 3  =  9
+D[2] appears in 2 rows      ->  2 × D[2] = 2 × 0  =  0
+D[3] appears in 1 row       ->  1 × D[3] = 1 × 0  =  0
+                                            total  =  9  ✓
 ```
 
-For our array `[0, 3, 3, 3, 0]`:
+In general, `D[j]` appears in `p + 1 - j` rows when the prefix ends at `p`.
+Split that count into two parts to use Fenwick trees:
 
-| Prefix end `p` | `b1.sum(p)` | `b2.sum(p)` | Array prefix sum |
-| --- | --- | --- | --- |
-| 2 | 3 | 1 * 3 = 3 | 3 * 3 - 3 = 6 |
-| 3 | 3 | 1 * 3 = 3 | 4 * 3 - 3 = 9 |
-| 4 | 3 - 3 = 0 | 1 * 3 + 4 * (-3) = -9 | 5 * 0 - (-9) = 9 |
+```text
+(p + 1 - j) × D[j]  =  (p + 1) × D[j]  -  j × D[j]
+```
 
-The final row shows why we need the second tree: the value at index 4 is zero,
-but the sum of the array is still 9.
+Sum over all `j` from 0 to `p`:
+
+```text
+prefix_sum(p)  =  (p + 1) × sum(D[j])  -  sum(j × D[j])
+               =  (p + 1) × b1.sum(p)  -  b2.sum(p)
+```
+
+`b1` stores `D[j]` and `b2` stores `j × D[j]`. With the concrete numbers (`p = 3`):
+
+```text
+b1.sum(3)  =  D[0] + D[1] + D[2] + D[3]          =  0 + 3 + 0 + 0  =  3
+b2.sum(3)  =  0×D[0] + 1×D[1] + 2×D[2] + 3×D[3]  =  0 + 3 + 0 + 0  =  3
+
+prefix_sum(3)  =  (3 + 1) × 3 - 3  =  12 - 3  =  9  ✓
+```
+
+Why is `b2` needed at all? Consider `prefix_sum(4)` on the same array — the
+total is still 9 but `A[4] = 0`:
+
+```text
+b1.sum(4)  =  D[0]+D[1]+D[2]+D[3]+D[4]  =  0+3+0+0-3  =  0   (equals A[4])
+b2.sum(4)  =  0×0 + 1×3 + 2×0 + 3×0 + 4×(-3)          =  -9
+
+prefix_sum(4)  =  5 × 0 - (-9)  =  9  ✓
+```
+
+`b1.sum(4)` is 0, which looks wrong, but `b2` carries the memory that 3 was
+added over indices 1–3 and supplies the correction.
 
 ### 3. Subtract two prefixes to query a range
 
@@ -264,10 +281,14 @@ def range_add(left, right, delta):
         b2.add(right + 1, -(right + 1) * delta)
 
 def prefix_sum(p):
-    # Count each change p + 1 times, then remove its extra copies.
+    # sum(A[0..p]) = (p+1)*sum(D[j]) - sum(j*D[j])
+    # D[j] at position j contributes (p - j + 1) times to the prefix sum.
+    # Split that count: (p+1)*b1.sum(p) supplies all copies, b2.sum(p) removes the extra j copies.
     return (p + 1) * b1.sum(p) - b2.sum(p)
 
 def range_sum(left, right):
+    # Subtract the prefix ending just before left from the prefix ending at right.
+    # prefix_sum(-1) returns 0, so this also works when left == 0.
     return prefix_sum(right) - prefix_sum(left - 1)
 
 range_add(1, 3, 3)                  # [0, 3, 3, 3, 0]
