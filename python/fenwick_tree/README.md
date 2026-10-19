@@ -1,43 +1,53 @@
-# Fenwick Tree
+# Fenwick tree
 
-A Fenwick tree (binary indexed tree) supports point additions and prefix sums in
-**O(log n)**, with **O(n)** construction and storage.
+A Fenwick tree (binary indexed tree) maintains prefix sums using O(n) storage.
+Point additions and prefix or range-sum queries take O(log n).
 
-The implementation in `fenwick_tree/fenwick_tree.py` is self-contained and
-compatible with Python 2.7. Copy it directly into your project.
+## Files
 
-## Interface
+| File | Purpose |
+| --- | --- |
+| [Implementation](fenwick_tree/fenwick_tree.py) | FenwickTree class |
+| [Example](fenwick_tree/example_for_fenwick_tree.py) | Point additions, assignments via deltas, and two-tree range additions |
+| [Implementation guide](fenwick_tree/README.md) | API, internals, expected output, and test coverage |
+| [Point-update tests](fenwick_tree/test_fenwick_tree.py) | Prefix and range sums, singleton and empty trees |
+| [Range-update tests](fenwick_tree/test_range_update_range_query.py) | Two-tree additions and sums |
 
-| Method | Description |
-|--------|-------------|
-| `FenwickTree(n)` | Create `n` elements initialised to zero; `n >= 0` |
-| `add(i, delta)` | Add `delta` to the element at 0-based index `i` |
-| `sum(i)` | Return the inclusive prefix sum over `[0, i]` |
+## Run the example
 
-For `add`, use `0 <= i < n`. For `sum`, use `-1 <= i < n`;
-`sum(-1)` returns zero for the empty prefix. Bounds are not checked.
-
-## Usage
-
-```python
-sales = [200, 150, 300, 250, 400]
-tree = FenwickTree(len(sales))
-for i, value in enumerate(sales):
-    tree.add(i, value)
-
-tree.sum(2)                     # -> 650 (indices 0 through 2)
-tree.sum(4) - tree.sum(1)       # -> 950 (indices 2 through 4)
-
-tree.add(2, -170)               # change sales at index 2 from 300 to 130
-tree.sum(2)                     # -> 480
-tree.sum(4)                     # -> 1130
-```
-
-`add` increments an element; to assign a new value, pass `new_value - old_value`.
-For any inclusive range `[left, right]`, use `sum(right) - sum(left - 1)`.
-
-Run the tests from the repository root:
+From the repository root, with no third-party dependencies:
 
 ```sh
-python -m pytest python/fenwick_tree/fenwick_tree/test_fenwick_tree.py -v
+python python/fenwick_tree/fenwick_tree/example_for_fenwick_tree.py
 ```
+
+## When to use it
+
+Use one tree for point additions and range sums. Use the two-tree technique
+shown in the example for range additions and range sums.
+
+An assignment requires the delta new_value - old_value. Inclusive range sums
+are computed as sum(right) - sum(left - 1), with sum(-1) returning zero.
+
+This implementation does not support general range min/max. Those aggregates
+cannot be recovered by subtracting prefixes: [1, 5] and [1, 9] have identical
+prefix minima but different minima on [1, 1].
+
+Choose a [segment tree](../segment_tree/README.md) for point assignments with
+custom associative aggregates, or a lazy segment tree for additive range
+updates with min/max queries. The current two-tree and lazy-tree implementations
+do not provide range assignment.
+
+## Run the tests
+
+Install pytest if needed with python -m pip install pytest, then run from the
+repository root:
+
+```sh
+python -m pytest python/fenwick_tree/fenwick_tree -v
+```
+
+Expected outcome: **9 passed**. Add -s to see the overlapping-update test print
+each expected range sum.
+
+[Back to the Python catalog](../README.md)

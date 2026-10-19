@@ -15,9 +15,16 @@ from lazy_segment_tree import LazySegmentTree
 
 
 def test_find_first_workaround():
-    # Original template use case: range additive update + find_first.
-    # Workaround: two trees (min + max) and binary search.
-    # All elements start at 0 (identity=0). range_add accumulates onto that base.
+    # Expected search results, in assertion order: 0, 3, -1, 1, 3, 2, -1.
+    # Start:                       [0, 0, 0, 0, 0]
+    # Add 3 to indices 0 through 2: [3, 3, 3, 0, 0]
+    # First 3 is at index 0; first 0 is at index 3; 9 is absent (-1).
+    # Add 2 to indices 1 through 3: [3, 5, 5, 2, 0]
+    # First 5 is at index 1; first 2 is at index 3.
+    # Within indices 2 through 4, [5, 2, 0], the first 5 is at index 2.
+    # Within indices 3 through 4, [2, 0], there is no 5 (-1).
+    # This search is not correct for every array: [1, 3] has no 2,
+    # even though 2 lies between its smallest and largest values.
     n = 5
     st_min = LazySegmentTree(n, aggregate_func=min, identity=0)
     st_max = LazySegmentTree(n, aggregate_func=max, identity=0)
@@ -53,9 +60,12 @@ def test_find_first_workaround():
 
 
 def test_range_sum_with_range_add():
-    # Employees have base salaries; apply raises to a department, then query totals.
-    # For sum, update_func must scale delta by size so a range update adds
-    # delta to each element, not just once to the node's aggregate.
+    # Expected query results, in assertion order: 29800, 16000, 31300, 16000, 32500.
+    # Start:                         [5000, 4000, 4500, 6000, 5500, 4800]
+    # Add 500 to indices 1 through 3: [5000, 4500, 5000, 6500, 5500, 4800]
+    # Add 200 to all six:             [5200, 4700, 5200, 6700, 5700, 5000]
+    # Totals after these steps: 29800 -> 31300 -> 32500.
+    # After the first raise, indices 1 through 3 are [4500, 5000, 6500], sum = 16000.
     salaries = [5000, 4000, 4500, 6000, 5500, 4800]
     st = LazySegmentTree(len(salaries), aggregate_func=operator.add,
                          update_func=lambda val, delta, size: val + delta * size,
@@ -74,7 +84,12 @@ def test_range_sum_with_range_add():
 
 
 def test_range_max_with_range_add():
-    # Players have scores; add bonus points to a range, then find the highest score.
+    # Expected query results, in assertion order: 30, 20, 40, 25.
+    # Before: [10, 20, 15, 30, 25, 18]
+    # Add 10 to indices 2 through 4:
+    # After:  [10, 20, 25, 40, 35, 18]
+    # Largest overall: 30 -> 40.
+    # Largest in indices 0 through 2: 20 -> 25.
     scores = [10, 20, 15, 30, 25, 18]
     st = LazySegmentTree(len(scores), aggregate_func=max, identity=0, nums=scores)
 
@@ -87,7 +102,12 @@ def test_range_max_with_range_add():
 
 
 def test_range_min_with_range_add():
-    # Items have prices; apply a discount to a range, then find the cheapest.
+    # Expected query results, in assertion order: 80, 90, 65, 75.
+    # Before: [100, 80, 120, 90, 110]
+    # Subtract 15 from indices 1 through 3:
+    # After:  [100, 65, 105, 75, 110]
+    # Smallest overall: 80 -> 65.
+    # Smallest in indices 2 through 4: 90 -> 75.
     prices = [100, 80, 120, 90, 110]
     st = LazySegmentTree(len(prices), aggregate_func=min, identity=0, nums=prices)
 
@@ -100,7 +120,13 @@ def test_range_min_with_range_add():
 
 
 def test_range_update_alias():
-    # range_update is an alias for update — both should produce identical results
+    # Expected point-query results for BOTH trees, i = 0..4: [10, 25, 20, 35, 25].
+    # Expected range_query(0, 4) for BOTH trees: 35.
+    # Both trees start with: [10, 20, 15, 30, 25]
+    # Add 5 to indices 1 through 3 using update on one tree
+    # and range_update on the other.
+    # Both should represent: [10, 25, 20, 35, 25]
+    # Compare every value and the largest value in the whole array.
     vals = [10, 20, 15, 30, 25]
     st_a = LazySegmentTree(len(vals), aggregate_func=max, identity=0, nums=vals)
     st_b = LazySegmentTree(len(vals), aggregate_func=max, identity=0, nums=vals)
@@ -114,11 +140,13 @@ def test_range_update_alias():
 
 
 def test_range_multiply_no_overlap():
-    # Scale values in a range by a multiplier, then query the total sum.
-    # update_func is multiplicative; identity=1 so 1*v=v on initialisation.
-    # Multiplicative update does not need size: multiplying every element by delta
-    # scales the aggregate by the same factor regardless of range width.
-    # (a*d) + (b*d) + (c*d) = (a+b+c)*d  ->  val * delta, no * size needed.
+    # Expected query results, in assertion order: 20, 32, 24.
+    # Before: [2, 3, 4, 5, 6] -> total = 20.
+    # Double indices 1 through 3:
+    # After:  [2, 6, 8, 10, 6] -> total = 32.
+    # Indices 1 through 3 contain [6, 8, 10] -> sum = 24.
+    # Only one multiplication update is tested. Repeated updates on overlapping
+    # ranges can give wrong answers: pending update values are added, not multiplied.
     values = [2, 3, 4, 5, 6]
     st = LazySegmentTree(len(values), aggregate_func=operator.add,
                          update_func=lambda val, delta, size: val * delta,
