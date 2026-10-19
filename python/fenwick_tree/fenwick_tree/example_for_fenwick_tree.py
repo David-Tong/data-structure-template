@@ -95,10 +95,54 @@ def demonstrate_range_updates():
         print("Total: {}".format(range_sum(0, n - 1)))
 
 
+def demonstrate_order_statistics():
+    print("=== demonstrate_order_statistics() ===")
+    # Find the k-th smallest element using a frequency Fenwick tree.
+    #
+    # Instead of storing values at array positions, store counts at value
+    # positions: freq.add(v - 1, 1) increments how many times value v appears.
+    # freq.sum(i) then returns how many elements have value <= i+1.
+    # The k-th smallest is the smallest value v where freq.sum(v-1) >= k.
+    #
+    # Values must lie in a known range [1..max_val].
+    # Insert: O(log max_val). K-th query: O(log^2 max_val) with binary search.
+    values = [3, 1, 4, 1, 5, 2, 3, 3]
+    max_val = 5  # all values are in [1..5]
+    freq = FenwickTree(max_val)
+    for v in values:
+        freq.add(v - 1, 1)  # value v stored at 0-based index v-1
+
+    # freq counts (0-based indices 0..4 represent values 1..5):
+    #   index 0 (value 1): 2   index 1 (value 2): 1   index 2 (value 3): 3
+    #   index 3 (value 4): 1   index 4 (value 5): 1
+    # Sorted: [1, 1, 2, 3, 3, 3, 4, 5]
+
+    def kth_smallest(k):
+        # Binary search: find smallest 0-based index i where freq.sum(i) >= k,
+        # then return i+1 as the 1-based value.
+        lo, hi = 0, max_val - 1
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if freq.sum(mid) >= k:
+                hi = mid
+            else:
+                lo = mid + 1
+        return lo + 1
+
+    print("Values: {}".format(values))
+    print("Sorted: [1, 1, 2, 3, 3, 3, 4, 5]")
+    print("1st smallest: {}".format(kth_smallest(1)))  # 1
+    print("3rd smallest: {}".format(kth_smallest(3)))  # 2
+    print("4th smallest: {}".format(kth_smallest(4)))  # 3
+    print("8th smallest: {}".format(kth_smallest(8)))  # 5
+
+
 def main():
     demonstrate_point_updates()
     print()
     demonstrate_range_updates()
+    print()
+    demonstrate_order_statistics()
 
 
 if __name__ == "__main__":

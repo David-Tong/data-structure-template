@@ -303,6 +303,70 @@ Each range update or query takes O(log n); the two trees use O(n) storage.
 This technique supports additive updates, including negative and overlapping
 updates, but does not implement range assignment or range min/max.
 
+## Beyond range sum
+
+A Fenwick tree works for any operation that has an **inverse**. The range query
+step computes `range(l, r) = prefix(r) OP_INVERSE prefix(l-1)`, so undoing the
+left prefix must be possible.
+
+| Operation | Inverse | Works? |
+| --- | --- | --- |
+| Addition | Subtraction | yes |
+| XOR | XOR itself (`a XOR a = 0`) | yes |
+| Multiplication mod prime | Modular inverse | yes |
+| Max | none | **no** |
+| Min | none | **no** |
+
+Max and min have no inverse — knowing `max(prefix(r))` and `max(prefix(l-1))`
+tells you nothing about `max(l..r)`. Use a segment tree for those.
+
+### Order statistics — k-th smallest element
+
+Build a **frequency tree** over values instead of array positions. Each index
+represents a value; its stored count is how many times that value appears.
+
+```text
+Values:          [3, 1, 4, 1, 5, 2, 3, 3]
+Frequency tree (index = value, 1-based):
+  index:  1  2  3  4  5
+  count:  2  1  3  1  1
+```
+
+`freq.sum(v)` gives the count of elements with value ≤ v. To find the k-th
+smallest, binary search for the smallest index where that prefix count reaches k:
+
+```text
+k=1: freq.sum(1)=2 >= 1  ->  1st smallest = 1
+k=3: freq.sum(1)=2 < 3,  freq.sum(2)=3 >= 3  ->  3rd smallest = 2
+k=4: freq.sum(2)=3 < 4,  freq.sum(3)=6 >= 4  ->  4th smallest = 3
+k=8: freq.sum(4)=7 < 8,  freq.sum(5)=8 >= 8  ->  8th smallest = 5
+```
+
+Each insert is O(log n). Each k-th query is O(log² n) with binary search, or
+O(log n) by walking the tree's internal bit structure directly. See
+`demonstrate_order_statistics()` in [example_for_fenwick_tree.py](example_for_fenwick_tree.py)
+for the runnable version.
+
+### Range XOR
+
+XOR is its own inverse, so `range_xor(l, r) = prefix_xor(r) XOR prefix_xor(l-1)`
+works by the same logic as range sum. The tree's internal `+=` becomes `^=`.
+Any two identical contributions cancel out, so there is no overflow and no
+second tree is needed.
+
+### Count inversions
+
+Count pairs `(i, j)` where `i < j` but `A[i] > A[j]`. Walk the array left to
+right; for each element, query how many already-inserted elements are strictly
+greater. A single frequency tree answers this in O(n log n) total after
+coordinate-compressing the values to `[1..n]`.
+
+### 2D range sum
+
+Extend to a grid: `sum(r1, c1, r2, c2)` uses four prefix queries exactly like
+the 1D case. Build one outer BIT over rows where each node is itself a BIT over
+columns. Build time is O(n² log² n); each update or query is O(log² n).
+
 ## Tests
 
 In [test_fenwick_tree.py](test_fenwick_tree.py):
